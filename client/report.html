@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 보고서 생성기</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/tgrid@latest/lib/umd/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
+    <style>
+        .upload-area {
+            border: 2px dashed #374151;
+            transition: all 0.3s ease;
+        }
+        .upload-area.drag-over {
+            border-color: #3b82f6;
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        .template-card {
+            transition: all 0.3s ease;
+        }
+        .template-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-blue-400 mb-2">AI 보고서 생성기</h1>
+            <p class="text-gray-300">템플릿을 업로드하고 AI가 전문적인 보고서를 작성해드립니다</p>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="flex justify-center mb-8">
+            <div class="flex space-x-1 bg-gray-800 rounded-lg p-1">
+                <button id="tab-upload" class="tab-button px-6 py-2 rounded-md text-sm font-medium transition-colors bg-blue-600 text-white">
+                    템플릿 업로드
+                </button>
+                <button id="tab-generate" class="tab-button px-6 py-2 rounded-md text-sm font-medium transition-colors text-gray-300 hover:text-white">
+                    보고서 생성
+                </button>
+                <button id="tab-reports" class="tab-button px-6 py-2 rounded-md text-sm font-medium transition-colors text-gray-300 hover:text-white">
+                    생성된 보고서
+                </button>
+            </div>
+        </div>
+
+        <!-- Upload Template Tab -->
+        <div id="upload-section" class="tab-content">
+            <div class="max-w-2xl mx-auto">
+                <div class="bg-gray-800 rounded-lg p-6 mb-6">
+                    <h2 class="text-xl font-semibold mb-4">템플릿 파일 업로드</h2>
+                    
+                    <div class="upload-area rounded-lg p-8 text-center cursor-pointer" id="upload-area">
+                        <div id="upload-placeholder">
+                            <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <p class="text-lg text-gray-300 mb-2">PDF 또는 DOCX 파일을 드래그하거나 클릭하여 업로드</p>
+                            <p class="text-sm text-gray-500">최대 10MB까지 지원</p>
+                        </div>
+                        <div id="upload-progress" class="hidden">
+                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-400 mx-auto"></div>
+                            <p class="text-gray-300 mt-2">파일을 분석 중입니다...</p>
+                        </div>
+                    </div>
+                    
+                    <input type="file" id="file-input" class="hidden" accept=".pdf,.docx">
+                    
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-300 mb-2">템플릿 제목</label>
+                        <input type="text" id="template-title" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:border-blue-400" placeholder="예: 월간 보고서 템플릿">
+                    </div>
+                    
+                    <div class="mt-4">
+                        <label class="block text-sm font-medium text-gray-300 mb-2">설명 (선택사항)</label>
+                        <textarea id="template-description" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:border-blue-400" rows="3" placeholder="템플릿에 대한 간단한 설명을 입력하세요"></textarea>
+                    </div>
+                </div>
+
+                <!-- Uploaded Templates -->
+                <div id="templates-list" class="bg-gray-800 rounded-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4">업로드된 템플릿</h3>
+                    <div id="templates-container" class="space-y-3">
+                        <p class="text-gray-400 text-center py-8">아직 업로드된 템플릿이 없습니다</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Generate Report Tab -->
+        <div id="generate-section" class="tab-content hidden">
+            <div class="max-w-4xl mx-auto">
+                <div class="grid md:grid-cols-2 gap-6">
+                    <!-- Template Selection -->
+                    <div class="bg-gray-800 rounded-lg p-6">
+                        <h2 class="text-xl font-semibold mb-4">템플릿 선택</h2>
+                        <div id="template-selector" class="space-y-3">
+                            <p class="text-gray-400">템플릿을 먼저 업로드해주세요</p>
+                        </div>
+                    </div>
+
+                    <!-- Report Configuration -->
+                    <div class="bg-gray-800 rounded-lg p-6">
+                        <h2 class="text-xl font-semibold mb-4">보고서 설정</h2>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">보고서 제목</label>
+                                <input type="text" id="report-title" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:border-blue-400" placeholder="예: 2024년 1분기 매출 보고서">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-300 mb-2">작성할 내용 설명</label>
+                                <textarea id="report-prompt" class="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-white focus:outline-none focus:border-blue-400" rows="6" placeholder="AI가 작성할 보고서의 내용에 대해 상세히 설명해주세요. 예:
+- 1분기 매출 실적: 목표 대비 120% 달성
+- 주요 성과: 신제품 출시로 인한 매출 증가
+- 문제점: 원자재 비용 상승
+- 개선 방안: 공급업체 다변화 검토"></textarea>
+                            </div>
+                            
+                            <button id="generate-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                보고서 생성하기
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Generated Report Preview -->
+                <div id="report-preview" class="mt-6 bg-gray-800 rounded-lg p-6 hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-lg font-semibold">생성된 보고서</h3>
+                        <button id="download-button" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md transition-colors">
+                            다운로드
+                        </button>
+                    </div>
+                    <div id="report-content" class="prose prose-invert max-w-none bg-gray-900 rounded-lg p-4 overflow-auto max-h-96"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reports List Tab -->
+        <div id="reports-section" class="tab-content hidden">
+            <div class="max-w-4xl mx-auto">
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <h2 class="text-xl font-semibold mb-4">생성된 보고서 목록</h2>
+                    <div id="reports-container" class="space-y-4">
+                        <p class="text-gray-400 text-center py-8">생성된 보고서가 없습니다</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="./module/tstl.umd.js"></script>
+    <script src="./module/tgrid.umd.js"></script>
+    <script src="report-script.js"></script>
+</body>
+</html>
